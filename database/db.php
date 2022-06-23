@@ -13,23 +13,31 @@ use Exception;
  * @update: C. Moller - 24 Jan 2017
  *   - Moved to OneFile
  *
- * @update: C. Moller - 19 Jan to 7 Mar 2020
- *   - Total Refactor!
+ * @update: C. Moller - 19 Jan 2020 to 07 Mar 2020 - Ver 2.0.0
+ *   - Total refactor!
  *   - Add db->execRaw()
  *   - Add db->insertInto()
  *   - Add db->updateOrInsertInto()
  *   - Add db->batchUpdate()
  *   - Add db->arrayIsSingleRow()
  *   - Add db->indexList()
+ *   - Add db->query()->select()
  *   - Add db->query()->having()
  *   - Add db->query()->orHaving()
  *   - Add db->query()->update()
  *   - Add db->query()->delete()
+ *   - Add db->query()->build{*.}Sql()
  *   - Remove db->query()->addExpression()
  *   - Change QueryStatement to PDOQuery
  *   - Change QueryExpression to PDOWhere
  *   - Simplify classes + Change query builder syntax!
+ *   - Simplyfy PDOWhere contructor. No more OPERATOR + GLUE params
  *   - Re-write build() methods
+ * 
+ * @update: C. Moller - 07 Mar 2020 to 20 Mar 2020 - Ver 3.0.0
+ *   - Significant refactor
+ *   - Replace db->query()->exec()/execRaw()/queryRaw() with db->cmd()
+ *   - Update doc comments
  *
  * ------
  * Query:
@@ -51,11 +59,11 @@ use Exception;
  *    $db->subQuery()
  *     ->where('date1 BETWEEN (?,?)', [$minDate,$maxDate])         // Exclusive
  *     ->where('date2', [$fromDate,$toDate], ['test'=>'FROM TO'])  // Inclusive
- *     ->where('age', [$minAge,$maxAge], ['test'=>'FROM TO'])
- *     ->orWhere(is_weekend IS NOT NULL)
+ *     ->where('age'  , [$minAge  ,$maxAge], ['test'=>'FROM TO'])
+ *     ->orWhere('is_weekend IS NULL')
  *  )
  *
- *  ->where('tagCount<?', $db->subQuery('tblconfig')->getFirst('max_tags'))
+ *  ->where('tagCount<?', $db->subQuery('tblconfig')->getFirst()->max_tags)
  *
  *  ->orWhere('CONCAT(firstname," ",lastname) LIKE ?)', "%$nameTerm%")
  *  ->orWhere('name LIKE ?', "%$nameTerm%", ['ignore'=>[null,'']])
@@ -63,6 +71,20 @@ use Exception;
  *
  *  ->orderBy('date')  // Defaults to 'asc'
  *  ->orderBy('date desc, time')
+ *
+ *  ->groupBy('age')
+ *
+ *  ->having('TotalUsers>=?', 10)
+ *  ->having('TotalUsers<=?', 20)
+ *  ->orHaving(
+ *    $db->subQuery()
+ *      ->where('Awards<?', 3)
+ *      ->where(
+ *        $db->subQuery()
+ *          ->where('Skill>? AND Skill<?', [3000,5000])
+ *          ->orWhere('TotalPoints>?', 1000)
+ *      )
+ *  )
 
  *  ->limit(100)
  *  ->limit(100, 15)
@@ -79,6 +101,8 @@ use Exception;
  *
  *  ->getFirst();
  *  ->getFirst('id,desc');
+ *
+ *  ->count()
  *
  *
  * -------
@@ -141,24 +165,21 @@ class Database extends PDO
   protected $connection = array();
 
   /**
+   * Initialize a new database connection and
+   * DB service instance.
    *
-   * @param array|string $config
-   *   Examples:
-   *   ---------
+   * @param array $config
    *   $config = [
    *    'DBHOST'=>'...',
    *    'DBNAME'=>'...',
    *    'DBUSER'=>'...',
    *    'DBPASS'=>'...'
    *   ];
-   *   - OR -
-   *   $config = __DIR__ . '/dbconfig.php;
    */
   public function __construct( $config = null )
   {
     // SAY_hello( __METHOD__ );
-    if( is_string( $config ) and file_exists( $config ) ) { include( $config ); }
-    elseif( $config and is_array( $config ) ) { $this->config = $config; }
+    if( $config and is_array( $config ) ) { $this->config = $config; }
     else { throw new Exception( 'Database connect error. No config.', 500 ); }
     $dbHost = $this->config[ 'DBHOST' ];
     $dbName = $this->config[ 'DBNAME' ];
@@ -189,127 +210,71 @@ class Database extends PDO
   }
 
   /**
-   * Raw SQL command
-   *
-   * NOTE: NO query builder, NO PDO placeholders, just SQL. It's your
-   * responsibility to escape query params.
+   * Executes SQL commands (For commands without quick methods)
    *
    * Examples:
    * ---------
-   * $db->execRaw( "INSERT INTO tblUsers (name,age) VALUES ('John','27')" );
-   * $db->execRaw( "UPDATE `tblUsers` SET `name`='Johnny' WHERE `id`='1'" );
-   * $db->execRaw( "DELETE FROM `tblUsers` WHERE `id`='1'" );
-   * $db->execRaw( 'SET GLOBAL log_output = "FILE"' );
-   * $db->execRaw( 'SET GLOBAL general_log_file = "nm_mysql.log"' );
-   * $db->execRaw( 'SET GLOBAL general_log = "ON"' );
+   * $db->cmd( 'SET GLOBAL log_output = ?', [ 'FILE' ] );
+   * $db->cmd( 'SET GLOBAL general_log_file = ?', [ 'nm_mysql.log' ] );
+   * $db->cmd( 'SET GLOBAL general_log = "ON"' );
    *
-   * @param string $sqlCommandStr
+   * @param string $cmdSqlStr
+   * @param array   $cmdParams Array of placeholder values.
    * @return integer Number of rows affected.
    */
-  public function execRaw( $sqlCommandStr )
+  public function cmd( $cmdSqlStr, $cmdParams = null )
   {
     // SAY_hello( __METHOD__ );
-    $affectedRows = parent::exec( $sqlCommandStr );
+    if( $cmdParams )
+    {
+      $preparedCommand = $this->prepare( $cmdSqlStr );
+      $affectedRows = $preparedCommand->execute( $cmdParams );
+    }
+    else
+    {
+      $affectedRows = parent::exec( $cmdSqlStr );
+    }
     return $affectedRows;
-  }
-
-  /**
-   * SQL Command with PDO placeholders
-   *
-   * NOTE: NO query builder, but PDO placeholders are allowed!
-   *
-   * @param  string  $sqlCommandStr e.g. 'UPDATE tblusers SET name=? WHERE id=?'
-   * @param  array   $queryParams Array of placeholder values.
-   * @return integer Number of affected rows.
-   */
-  public function exec( $sqlCommandStr, $queryParams = null )
-  {
-    // SAY_hello( __METHOD__ );
-    $preparedQuery = $this->prepare( $sqlCommandStr );
-    $affectedRows = $preparedQuery->execute( $queryParams );
-    return $affectedRows;
-  }
-
-  /**
-   * Syntax sugar. $db->execRaw() Clone.
-   * @param string $sqlCommandStr
-   * @return integer Number of rows affected.
-   */
-  public function cmd( $sqlCommandStr )
-  {
-    // SAY_hello( __METHOD__ );
-    return $this->execRaw( $sqlCommandStr );
-  }
-
-  /**
-   * Raw SQL query
-   *
-   * NOTE: NO query builder, NO PDO placeholders, just SQL. It's your
-   * responsibility to escape query params.
-   *
-   * Examples:
-   * ---------
-   * $db->queryRaw( 'SELECT * FROM tblusers' )
-   * $db->queryRaw( 'SELECT COUNT(*) AS TotalNumberOfUsers FROM tblusers' )
-   * $db->queryRaw( 'SHOW COLUMNS FROM tblusers' )
-   *
-   * @param string $sqlQueryStr
-   * @return object -*UNPREPARED*- PDOStatement object.
-   */
-  public function queryRaw( $sqlQueryStr )
-  {
-    // SAY_hello( __METHOD__ );
-    return parent::query( $sqlQueryStr );
   }
 
   /**
    * Incremental (multi-stage) PDO query builder and results fetcher.
    *
-   * This method is especially usefull when you have varying query conditions.
-   * A common use case would be to generate queries for list-type pages...
-   * $db->query() allows you to add various filter, sorting and pagination
-   * options dynamically / incrementally while keeping your code clean
-   * and readable.
+   * $db->query() makes SQL easier and cleaner to write when you have
+   * multiple conditional segments that depend on the current state or
+   * request.
    *
-   * @param string $tablesExpr Required e.g 'tblusers', 'tblusers AS u'
-   * @param array $options Store instance specific META data here.
-   * @return PDOQuery
+   * NOTE: We override PDO::query(). If you ever need to use the
+   * legacy implementation, call db->query() with `options`='legacy'
+   *
+   * @param string $tablesExpr Required e.g 'tblusers', 'tblusers u'
+   * @param array|string $options Select LEGACY mode or store metadata.
+   * @return PDOQuery|PDOStatement
    */
   public function query( $tablesExpr, $options = null )
   {
     // SAY_hello( __METHOD__ );
+    if( $options == 'legacy' )
+    {
+      $querySqlStr = $tablesExpr;
+      return parent::query( $querySqlStr );
+    }
     return new PDOQuery( $this, $tablesExpr, $options );
   }
 
   /**
-   * Syntax sugar. The same as $db->query() with optional $tablesExpr.
-   * Used to create nested queries.
+   * Syntax sugar. Used to create nested queries.
+   * The same as $db->query() except for OPTIONAL $tablesExpr.
+   *
    * @param string $tablesExpr Optional
    * @param array $options Optional
    * @return PDOQuery
    */
-  public function subQuery( $tablesExpr, $options = null )
+  public function subQuery( $tablesExpr = null, $options = null )
   {
     // SAY_hello( __METHOD__ );
-    return $this->query( $tablesExpr, $options );
+    return new PDOQuery( $this, $tablesExpr, $options );
   }
-
-
-  /**
-   * Deletes ALL rows from a table.
-   *
-   * NOTE: Can NOT be rolled back!
-   * NOTE: Requires DROP privilage!
-   * NOTE: Resets Auto increment to 1
-   * @param  string $tableName
-   * @return boolean Success / Fail
-   */
-  public function truncate( $tableName = null )
-  {
-    // SAY_hello( __METHOD__ );
-    return $this->exec( 'TRUNCATE TABLE ?', $tableName );
-  }
-
 
   /**
    * Inserts a single or multiple data rows into a database table.
@@ -345,10 +310,10 @@ class Database extends PDO
     // SHOW_me( $rows, 'Batch Insert Into Rows', 3 );
     foreach( $rows as $r )
     {
-      if( is_object($r) ) { $r = (array) $r; }
+      if( is_object( $r ) ) { $r = (array) $r; }
       if( $i == 0 )
       {
-        foreach($r as $colName => $colValue)
+        foreach( $r as $colName => $colValue )
         {
           $qMarks[] = '?';
           $colNames[] = $colName;
@@ -373,13 +338,13 @@ class Database extends PDO
     $this->log[] = 'affectedRows: ' . print_r( $affectedRows, true );
     SHOW_me( $affectedRows, 'Batch Insert Into affectedRows' );
     return $affectedRows;
-  } // end: batchInsert
+  } // end: insertInto
 
   /**
    * Batch update OR insert multiple database rows in one go.
    *
    * NOTE: For UpdateOrInsert to work, the target database table MUST have
-   * a PRIMARY KEY / UNIQUE constaint on at least one or more columns.
+   * a PRIMARY KEY / UNIQUE constraint on at least one or more columns.
    * The values of columns with contraints MUST also be included in
    * the data provided! e.g. [[id=>1, ...], ...] where id == PK.
    *
@@ -395,7 +360,7 @@ class Database extends PDO
    * @param array $options
    *    e.g. $opts = [ 'where' => 'id=?', 'excl'=>['id', 'created_at']    ]
    *    e.g. $opts = [ 'where' => 'pk1=? AND pk2=?', 'only' => ['name']   ]
-   *    e.g. $opts = [ 'where' => ['pk=? AND pk2=?', 'pk1,pk1']           ]
+   *    e.g. $opts = [ 'where' => ['pk1=? AND pk2=?', 'pk1,pk2']          ]
    *    e.g. $opts = [ 'only'  => ['name', 'updated_at']                  ]
    *    See db->update()
    * @return boolean success
@@ -508,9 +473,9 @@ class Database extends PDO
       {
         foreach( $row as $colName => $colVal )
         {
-          if( in_array($colName, $only) )
+          if( in_array( $colName, $only ) )
           {
-            $guardedRow[$colName] = $colVal;
+            $guardedRow[ $colName ] = $colVal;
           }
         }
       }
@@ -518,9 +483,9 @@ class Database extends PDO
       {
         foreach( $row as $colName => $colVal )
         {
-          if( ! in_array($colName, $exclude) )
+          if( ! in_array( $colName, $exclude ) )
           {
-            $guardedRow[$colName] = $colVal;
+            $guardedRow[ $colName ] = $colVal;
           }
         }
       }
@@ -532,7 +497,7 @@ class Database extends PDO
       if( $where )
       { // UPDATE ONLY
         $extraParams = array_map(
-          function( $colName ) use ($row) { return $row[$colName]; },
+          function( $colName ) use ( $row ) { return $row[ $colName ]; },
           $whereExprColNames
         );
         // SHOW_me( $extraParams, 'extraParams' );
@@ -555,7 +520,7 @@ class Database extends PDO
     $this->log[] = 'affectedRows: ' . print_r( $affectedRows, true );
     SHOW_me( $affectedRows, 'Batch Update or Insert affectedRows' );
     return $affectedRows;
-  } // end: updateOrInsert
+  } // end: updateOrInsertInto
 
   /**
    * Update multiple database table rows in one go. (UPDATE ONLY)
@@ -574,7 +539,7 @@ class Database extends PDO
    *   $options['where'] = [ '{strWhereExpr}', '{colName1},{colName2},..' ]
    * @return boolean success
    */
-  public function batchUpdate( $tablesExpr, $rows = null, $options = null)
+  public function batchUpdate( $tablesExpr, $rows = null, $options = null )
   {
     // SAY_hello( __METHOD__ );
     if( empty( $options['where'] ) )
@@ -613,8 +578,8 @@ class Database extends PDO
    *       '2-blue' => [ 'id'=>2, 'col'=>'blue', 'name'=>'item2' ]
    *      ]
    * @param array $list
-   * @param string $itemKeyNames Comma separated list of item key names.
-   * @param array $options [ 'ignore' => [ 'keyName1' => ['-', null, ''], .. ] ]
+   * @param string $itemKeyNames Comma separated list of item key names to use.
+   * @param array $options [ 'glue' => '-' ]
    * @return boolean success
    */
   public function indexList( array $list, $itemKeyNames = null, $options = null )
@@ -622,14 +587,11 @@ class Database extends PDO
     // SAY_hello( __METHOD__ );
     if( ! $list ) { return $list; }
     $indexedList = [];
-    $invalidCount = 0;
     $duplicatesCount = 0;
     $options = $options ?: [];
     $firstItem = reset( $list );
     $isObjectList = is_object( $firstItem );
-    $ignoreOpt = isset( $options[ 'ignore' ] ) ? $options[ 'ignore' ] : [];
     $glue = isset( $options[ 'glue' ] ) ? $options[ 'glue' ] : '-';
-    if( $ignoreOpt ) { SHOW_me( json_encode( $ignoreOpt ), 'Ignore option' ); }
     // SHOW_me( $glue, 'indexList: Index parts "glue"' );
     if( $itemKeyNames )
     {
@@ -650,21 +612,11 @@ class Database extends PDO
     {
       // SAY_hello( 'indexList: USE SINGLE KEY INDEX ROUTINE' );
       $itemKeyName = reset( $itemKeyNames );
-      if( $ignoreOpt )
-      {
-        $ignoreValues = isset( $ignoreOpt[ $itemKeyName ] ) ? $ignoreOpt[ $itemKeyName ] : null;
-        if( $ignoreValues and ! is_array( $ignoreValues ) ) { $ignoreValues = [ $ignoreValues ]; }
-      }
       foreach( $list as $listItem )
       {
         $index = $isObjectList
           ? $listItem->{ $itemKeyName }
           : $listItem[ $itemKeyName ];
-        if( $ignoreOpt and $ignoreValues and in_array( $index, $ignoreValues ) )
-        {
-          $invalidCount++;
-          continue;
-        }
         if( isset( $indexedList[ $index ] ) ) { $duplicatesCount++; }
         $indexedList[ $index ] = $listItem;
       }
@@ -681,22 +633,6 @@ class Database extends PDO
             ? $listItem->{ $itemKeyName }
             : $listItem[ $itemKeyName ];
           $indexPart = $index ? $glue . $itemKey : $itemKey;
-          if( $ignoreOpt )
-          {
-            $ignoreValues = isset( $ignoreOpt[ $itemKeyName ] ) ? $ignoreOpt[ $itemKeyName ] : null;
-            if( $ignoreValues )
-            {
-              if( ! is_array( $ignoreValues ) ) { $ignoreValues = [ $ignoreValues ]; }
-              if( $ignoreValues and in_array( $indexPart, $ignoreValues ) )
-              {
-                // SHOW_me( $indexPart, 'Invalid indexPart' );
-                // SHOW_me( $itemKeyName, 'Invalid Item Key Name' );
-                // SHOW_me( $listItem, 'Invalid List item' );
-                $invalidCount++;
-                continue 2;
-              }
-            }
-          }
           $index .= $indexPart;
         }
         // SHOW_me( $index, 'index' );
@@ -704,8 +640,6 @@ class Database extends PDO
         $indexedList[ $index ] = $listItem;
       }
     }
-    // SHOW_me( json_encode( [ 'IGNORED' => $invalidCount, 'DUPLICATES' => $duplicatesCount ] ), 'listIndex' );
-    // SHOW_me( $invalidCount, 'INVALID list items (i.e. items without valid PKs)' );
     // SHOW_me( $duplicatesCount, 'DUPLICATE list items (i.e. items with the same PK)' );
     // SHOW_me( $indexedList, 'indexedList', 5 );
     return $indexedList;
@@ -776,9 +710,9 @@ class PDOQuery
     $options = $options ?: [];
     $params = $params ? ( is_array( $params ) ? $params : [ $params ] ) : [];
     // Only check "ignore" on single param expressions.
-    if( count( $params ) == 1 and isset( $options[ 'ignore' ] ) )
+    if( count( $params ) <= 1 and array_key_exists( 'ignore', $options ) )
     {
-      $value = reset( $params );
+      $value = $params ? reset( $params ) : null;
       $valuesToIgnore = $options[ 'ignore' ];
       if( $value === $valuesToIgnore or is_array( $valuesToIgnore ) and
         in_array( $value, $valuesToIgnore ) )
@@ -843,6 +777,13 @@ class PDOQuery
     }
     $this->havingExpressions[] = new PDOWhere( $havingExpr, $params, $options );
     return $this;
+  }
+
+  public function orHaving( $havingExpr, $params = null, $options = null )
+  {
+    // SAY_hello( __METHOD__ );
+    $options = array_merge( $options?:[], [ 'glue' => 'OR' ] );
+    return $this->having( $havingExpr, $params, $options );
   }
 
   public function orderBy( $orderBy )
