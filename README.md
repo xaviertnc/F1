@@ -23,6 +23,7 @@
 - Events
 - Validate
 - Translate
+- Template
 - Captcha
 - Upload
 - Format
