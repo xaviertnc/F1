@@ -1,7 +1,7 @@
 <?php namespace F1;
 
 /**
- * Debug Class
+ * F1 - Debug Class
  * 
  * All things related to debugging runtime code.
  * 

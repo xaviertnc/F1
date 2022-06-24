@@ -5,7 +5,7 @@ use PDOStatement;
 use Exception;
 
 /**
- * DB Class
+ * F1 - DB Class
  * 
  * PDO Database Management class with layered Query Builder
  * to easily build-up different SQL queries based on variable 
