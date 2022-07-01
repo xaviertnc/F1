@@ -21,7 +21,7 @@ class HTTP {
     $this->baseUri = $baseUri;
     $req = new \stdClass();
     $req->uri = $_SERVER[ 'REQUEST_URI' ];
-    $req->path = $this->getRequestPath();
+    $req->path = $this->getRequestPath( $req->uri );
     $req->segments = $req->path ? explode( '/', $req->path ) : [];
     $req->method = $_SERVER[ 'REQUEST_METHOD' ];
     $req->data = $_REQUEST;
@@ -29,11 +29,9 @@ class HTTP {
   }
 
 
-  public function getRequestPath()
+  public function getRequestPath( $requestUri )
   {
-    $path = $this->baseUri
-      ? str_replace( $this->baseUri, '', $this->req->uri )
-      : $this->req->uri; 
+    $path = $this->baseUri ? str_replace( $this->baseUri, '', $requestUri ) : $requestUri;
     return trim( $path , '/' );
   }
 
