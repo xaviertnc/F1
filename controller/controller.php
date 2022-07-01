@@ -5,7 +5,7 @@
  * 
  * @author  C. Moller <xavier.tnc@gmail.com>
  * 
- * @version 1.0.0 - 23 Jun 2022
+ * @version 1.1.0 - 01 Jul 2022
  *
  */
 
@@ -13,23 +13,21 @@ class Controller {
 
   public $name;
 
-  public $dir;
+  public $fileDir;
 
 
-  public function __construct( $contentDir, $requestPathStr, $requestPage )
+  public function __construct( array $config )
   {
-
-    $this->name = $requestPage;
-    $this->dir = $contentDir . '/' . $requestPathStr;
-    
+    $baseDir = $config[ 'baseDir' ] ?? '';
+    $filePath = $config[ 'filePath' ] ?? '';
+    $this->name = $config[ 'name' ] ?? ( $filePath ? basename( $filePath ) : 'noname' );
+    $this->fileDir = ( $baseDir && $filePath ) ? $baseDir . DIRECTORY_SEPARATOR . $filePath : $baseDir;
   }
 
 
   public function getFile( $ext = '.php' )
   {
-
-    return $this->dir . '/' . $this->name . $ext;
-
+    return $this->fileDir . DIRECTORY_SEPARATOR . $this->name . $ext;
   }
 
 }
