@@ -1,5 +1,15 @@
 <?php namespace F1;
 
+/**
+ * 
+ * F1 - Template Class
+ * 
+ * @author  C. Moller <xavier.tnc@gmail.com>
+ * 
+ * @version 1.6.0 - 23 Jun 2022
+ *
+ */
+
 use Log;
 use Closure;
 use Exception;

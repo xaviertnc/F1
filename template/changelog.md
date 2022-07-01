@@ -38,5 +38,9 @@
    always align correctly.
  - Improve Template::compileYield() to properly detect and handle the top-most template level.
 
+## 23 Jun 2022 - Ver 1.6.0
+ - Move general doc comments and version history into their own files.
+ - Comment out more Log::template() statements.
+
 > TODO: Remove rarely used features. Simplify as is the OneFile motto!
 > TODO: Cleanup Code and Comments

@@ -16,6 +16,7 @@ use Exception;
  * @version 3.3.0 - 23 Jun 2022
  *
  */
+
 class DB extends PDO
 {
   public $log = array();

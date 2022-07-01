@@ -8,12 +8,13 @@
  * @author  C. Moller <xavier.tnc@gmail.com>
  * 
  * @version 1.0.0 - 23 Jun 2022
+ * 
  */
 
 class Debug {
 
   public $level;
-  public $logFile = __DIR__ . '/' . 'debug.log';
+  public $logFile = __DIR__ . DIRECTORY_SEPARATOR . 'debug.log';
   public static $longDateFormat = 'd M Y H:i:s';
   public static $shortDateFormat = 'Y-m-d';
 
