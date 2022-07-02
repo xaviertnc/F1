@@ -10,3 +10,8 @@
   - Rename $dir to $fileDir
   - Replace multiple constructor arguments with single $config array arg.
   - Change default getFile extensions to ".html.php"
+
+## 02 July 2022 - Ver 1.3.0
+  - Add $variant
+  - Add $fileBasename
+  - Add basic compile & manifest functions (i.e. view caching)
