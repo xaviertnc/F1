@@ -31,32 +31,33 @@ class View {
   }
 
 
-  public function compile( $uncompiledFile, $compiledFile, $manifestFile )
+  public function compile( $uncompiledFile, $compiledFile,
+    $manifestFile, &$manifest, $level = 0 )
   {
+    if ( $level++ > 3 ) return '';
+    $content = file_get_contents( $uncompiledFile );    
+    $pattern = '/\<\?php.*(get.*File)\((.*)\).*\?\>/';
     $matches = array();
-    $includes = array();
-    $manifest = array();
-    $content = file_get_contents( $uncompiledFile );
-    // echo '<pre>Uncompiled:', PHP_EOL, htmlentities( $content ), '</pre>';
-    $pattern = '/\<\?php.*getThemeFile\(\s*[\'"](.*)[\'"].+\?\>/';
     preg_match_all($pattern, $content, $matches);
-    // echo '<pre>Matches: ', var_export( $matches, true ), '</pre>';
+    //echo '<pre>Matches: ', var_export( $matches, true ), '</pre>';
     foreach ( $matches[0] as $index => $match )
     {
-      $templateFileID = $matches[1][$index];
-      //echo '<pre>templateFileID: ', var_export( $templateFileID, true ), '</pre>';
-      $dependantFile = $this->getThemeFile( $templateFileID );
-      $manifest[ $dependantFile ] = filemtime( $dependantFile );
-      $includeContent = file_get_contents( $dependantFile );
-      //echo '<pre>Match: ', htmlentities( $match ), '</pre>';
-      $content = str_replace( $match, $includeContent, $content);
+      $getterFn = $matches[1][ $index ];
+      $getterParam = trim( $matches[2][ $index ], ' \'"' );
+      //echo '<pre>getterParam: ', var_export( $getterParam, true ), '</pre>';
+      $dependancy = $this->{$getterFn}( $getterParam );
+      $manifest[ $dependancy ] = filemtime( $dependancy );
+      $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
+      $content = str_replace( $match, $subContent, $content );
     }
-    $content .= PHP_EOL . '<!-- Compiled: ' . date('Y-m-d H:i:s') . ' -->';
-    // echo '<pre>Compiled:', PHP_EOL, htmlentities( $content ), '</pre>';
-    file_put_contents( $compiledFile, $content );  
-    // echo '<pre>Manifest: ', var_export( $manifest, true ), '</pre>';
-    file_put_contents( $manifestFile, '<?php return ' . var_export( $manifest, true ) . '; ?>' );
-    return $compiledFile;
+    if ( $level === 1 )
+    {
+      $manifestContent = '<?php return ' . var_export( $manifest, true ) . '; ?>';
+      $content .= PHP_EOL . '<!-- Compiled: ' . date('Y-m-d H:i:s') . ' -->';
+      file_put_contents( $manifestFile, $manifestContent );
+      file_put_contents( $compiledFile, $content );  
+    }
+    return $content;
   }
 
 
@@ -71,10 +72,10 @@ class View {
     {
       $manifest = include( $manifestFile );
       $lastCompileTime = filemtime( $compiledFile );
-      foreach ($manifest ?: [] as $dependantFile => $timestamp)
+      foreach ($manifest ?: [] as $dependancy => $timestamp)
       {
-        if ( ! file_exists( $dependantFile ) or 
-          $timestamp < filemtime( $dependantFile ) )
+        if ( ! file_exists( $dependancy ) or 
+          $timestamp < filemtime( $dependancy ) )
         {
           $compile = true;
           break;
@@ -86,7 +87,10 @@ class View {
       $compile = true;
     }
     $uncompiledFile = $this->getUncompiledFile();
-    if ( $compile ) $this->compile( $uncompiledFile, $compiledFile, $manifestFile );
+    if ( $compile ) {
+      $manifest = array( $uncompiledFile => filemtime( $uncompiledFile ) );
+      $this->compile( $uncompiledFile, $compiledFile, $manifestFile, $manifest );
+    }
     return $compiledFile;
   }
 
