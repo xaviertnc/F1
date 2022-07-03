@@ -15,3 +15,6 @@
   - Add $variant
   - Add $fileBasename
   - Add basic compile & manifest functions (i.e. view caching)
+
+## 02 July 2022 - Ver 1.3.1
+  - Add replaceContent() to properly indent imported content.

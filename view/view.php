@@ -5,7 +5,7 @@
  *
  * @author C. Moller <xavier.tnc@gmail.com>
  * 
- * @version 1.3.0 - 02 July 2022
+ * @version 1.3.1 - 02 July 2022
  * 
  */
 
@@ -31,6 +31,25 @@ class View {
   }
 
 
+  public function replaceContent( $match, $replace, $content )
+  {
+    $parts = explode( $match, $content );
+    if ( count($parts) !== 2 ) return $content;
+    $before = substr( strrchr( $parts[0], "\n" ), 1 );
+    if ( ! trim( $before ) )
+    {
+      $lines = explode( "\n", $replace );
+      // echo '<pre>Lines: ', var_export( $lines, true ), '</pre>';
+      if ( count( $lines ) > 1 ) $replace = implode( "\n$before", $lines );
+    }
+    else
+    {
+      $replace = trim( preg_replace( '/\s\s+/', ' ', $replace ) );
+    }
+    return $parts[0] . $replace . $parts[1];
+  }
+
+
   public function compile( $uncompiledFile, $compiledFile,
     $manifestFile, &$manifest, $level = 0 )
   {
@@ -48,7 +67,7 @@ class View {
       $dependancy = $this->{$getterFn}( $getterParam );
       $manifest[ $dependancy ] = filemtime( $dependancy );
       $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
-      $content = str_replace( $match, $subContent, $content );
+      $content = $this->replaceContent( $match, $subContent, $content );
     }
     if ( $level === 1 )
     {
