@@ -7,3 +7,7 @@
   - Rename $dir to $fileDir
   - Replace multiple constructor arguments with single $config array arg.
   - Fix $fileDir generation logic.
+
+## 08 Jul 2022 - Ver 1.2.0
+  - Added $baseDir property
+  - Set $baseDir via $config[ 'controllersBaseDir' ]
