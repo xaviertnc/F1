@@ -76,9 +76,9 @@ class Debug {
   }
 
 
-  public function dump( $var )
+  public function dump( $var, $title = '' )
   {
-    echo '<pre>', PHP_EOL; print_r( $var ); echo '</pre>', PHP_EOL;
+    echo '<pre>', $title, PHP_EOL; print_r( $var ); echo '</pre>', PHP_EOL;
   }
 
 } // end: Class Debug
