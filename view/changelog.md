@@ -18,3 +18,11 @@
 
 ## 02 July 2022 - Ver 1.3.1
   - Add replaceContent() to properly indent imported content.
+
+## 08 July 2022 - Ver 1.4.0
+  - Improve view->compile().
+    * Compile now supports `<include>theme/file/path</include>`  
+        in place of `<?php include getThemeFile( 'theme/file/path' ); ?>` !!!
+    * Compile now removes white-space infront of single line `<?php` statements  
+      with nothing else on the same line to allow indented `<?php` tags in  
+      templates without breaking the final HTML output's formatting.  

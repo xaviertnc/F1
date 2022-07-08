@@ -5,7 +5,7 @@
  *
  * @author C. Moller <xavier.tnc@gmail.com>
  * 
- * @version 1.3.1 - 02 July 2022
+ * @version 1.4.0 - 08 July 2022
  * 
  */
 
@@ -15,6 +15,8 @@ class View {
   public $fileDir;
   public $themesDir;
   public $fileBasename;
+  public $scripts = [];
+  public $styles = [];
   public $variant;
   public $theme;
   public $title;
@@ -39,7 +41,6 @@ class View {
     if ( ! trim( $before ) )
     {
       $lines = explode( "\n", $replace );
-      // echo '<pre>Lines: ', var_export( $lines, true ), '</pre>';
       if ( count( $lines ) > 1 ) $replace = implode( "\n$before", $lines );
     }
     else
@@ -54,23 +55,41 @@ class View {
     $manifestFile, &$manifest, $level = 0 )
   {
     if ( $level++ > 3 ) return '';
-    $content = file_get_contents( $uncompiledFile );    
-    $pattern = '/\<\?php.*(get.*File)\((.*)\).*\?\>/';
+    $content = file_get_contents( $uncompiledFile );
     $matches = array();
+    $pattern = '/\<include\>(.+)\<\/include\>/';
     preg_match_all($pattern, $content, $matches);
-    //echo '<pre>Matches: ', var_export( $matches, true ), '</pre>';
-    foreach ( $matches[0] as $index => $match )
+    if ( $matches[0] )
     {
-      $getterFn = $matches[1][ $index ];
-      $getterParam = trim( $matches[2][ $index ], ' \'"' );
-      //echo '<pre>getterParam: ', var_export( $getterParam, true ), '</pre>';
-      $dependancy = $this->{$getterFn}( $getterParam );
-      $manifest[ $dependancy ] = filemtime( $dependancy );
-      $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
-      $content = $this->replaceContent( $match, $subContent, $content );
+      foreach ( $matches[0] as $index => $match )
+      {
+        $filePath = $matches[1][ $index ];
+        $dependancy = $this->getThemeFile( $filePath );
+        $manifest[ $dependancy ] = filemtime( $dependancy );
+        $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
+        $content = $this->replaceContent( $match, $subContent, $content );
+      }
+    }
+    else
+    {
+      $matches = array();
+      $pattern = '/\<\?php.*(get.*File)\((.*)\).*\?\>/';
+      preg_match_all($pattern, $content, $matches);
+      // debug_dump( $matches, 'VIEW::compile(), [get*File] matches:' );
+      foreach ( $matches[0] as $index => $match )
+      {
+        $fileGetFn = $matches[1][ $index ];
+        $filePath = trim( $matches[2][ $index ], ' \'"' );
+        $dependancy = $this->{$fileGetFn}( $filePath );
+        $manifest[ $dependancy ] = filemtime( $dependancy );
+        $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
+        $content = $this->replaceContent( $match, $subContent, $content );
+      }
     }
     if ( $level === 1 )
     {
+      $pattern = '/ +(?=\<\?php.+\?\>\s*$)/m';
+      $content = preg_replace($pattern, '', $content);
       $manifestContent = '<?php return ' . var_export( $manifest, true ) . '; ?>';
       $content .= PHP_EOL . '<!-- Compiled: ' . date('Y-m-d H:i:s') . ' -->';
       file_put_contents( $manifestFile, $manifestContent );
@@ -148,5 +167,17 @@ class View {
   {
     return $this->fileBasename . '.js';
   }
+
+
+  public function useStyleFile( $href )
+  {
+    $this->styles[] = $href;
+  }
+
+
+  public function useScriptFile( $href )
+  {
+    $this->scripts[] = $href;
+  }  
 
 }

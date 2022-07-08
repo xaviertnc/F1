@@ -6,7 +6,7 @@
  * 
  * @author  C. Moller <xavier.tnc@gmail.com>
  * 
- * @version 1.0.0 - 24 Jun 2022
+ * @version 1.1.0 - 08 Jul 2022
  *
  */
 
