@@ -1,7 +1,7 @@
 <?php namespace F1;
 
 /**
- * F1 - Controller Class
+ * F1 Controller Class - 24 Jun 2022
  * 
  * @author  C. Moller <xavier.tnc@gmail.com>
  * 
@@ -13,16 +13,16 @@ class Controller {
 
   public $name;
   public $baseDir;
-  public $fileDir;
+  public $controllerDir;
   public $notFound;
 
 
   public function __construct( array $config )
   {
-    $filePath = $config[ 'filePath' ] ?? '';
+    $filePath = $config[ 'controllerFilePath' ] ?? '';
     $baseDir = $config[ 'controllersBaseDir' ] ?? '';
     $this->name = $config[ 'name' ] ?? ( $filePath ? basename( $filePath ) : 'noname' );
-    $this->fileDir = ( $baseDir && $filePath ) ? $baseDir . DIRECTORY_SEPARATOR . $filePath : $baseDir;
+    $this->controllerDir = ( $baseDir && $filePath ) ? $baseDir . DIRECTORY_SEPARATOR . $filePath : $baseDir;
     $this->notFound = $config[ 'notFound' ] ?? '404.html';
     $this->baseDir = $baseDir;
   }
@@ -30,7 +30,7 @@ class Controller {
 
   public function getFile( $ext = '.php' )
   {
-    $file = $this->fileDir . DIRECTORY_SEPARATOR . $this->name . $ext;
+    $file = $this->controllerDir . DIRECTORY_SEPARATOR . $this->name . $ext;
     return file_exists( $file ) ? $file : $this->notFound;
   }
 

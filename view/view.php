@@ -1,20 +1,20 @@
 <?php namespace F1;
 
 /**
- * F1 - View Class
+ * F1 View Class - 23 June 2022
  *
  * @author C. Moller <xavier.tnc@gmail.com>
  * 
- * @version 1.4.0 - 08 July 2022
+ * @version 1.4.1 - 09 July 2022
  * 
  */
 
 class View {
 
   public $name;
-  public $fileDir;
+  public $viewDir;
   public $themesDir;
-  public $fileBasename;
+  public $viewFileBase;
   public $scripts = [];
   public $styles = [];
   public $variant;
@@ -25,9 +25,9 @@ class View {
   public function __construct( array $config )
   {
     $this->name = $config[ 'name' ];
-    $this->fileDir = $config[ 'fileDir' ] . DIRECTORY_SEPARATOR;
+    $this->viewDir = $config[ 'viewDir' ] . DIRECTORY_SEPARATOR;
     $this->themesDir = $config[ 'themesDir' ] . DIRECTORY_SEPARATOR;
-    $this->fileBasename = $this->fileDir . $this->name;
+    $this->viewFileBase = $this->viewDir . $this->name;
     $this->title = $config[ 'title' ] ?? $this->name;
     $this->theme = $config[ 'theme' ] ?? 'default';
   }
@@ -65,8 +65,12 @@ class View {
       {
         $filePath = $matches[1][ $index ];
         $dependancy = $this->getThemeFile( $filePath );
-        $manifest[ $dependancy ] = filemtime( $dependancy );
-        $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
+        $subContent = '/* File not found. */';
+        if ( file_exists( $dependancy ))
+        {
+          $manifest[ $dependancy ] = filemtime( $dependancy );
+          $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
+        }
         $content = $this->replaceContent( $match, $subContent, $content );
       }
     }
@@ -81,8 +85,12 @@ class View {
         $fileGetFn = $matches[1][ $index ];
         $filePath = trim( $matches[2][ $index ], ' \'"' );
         $dependancy = $this->{$fileGetFn}( $filePath );
-        $manifest[ $dependancy ] = filemtime( $dependancy );
-        $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
+        $subContent = '/* File not found. */';
+        if ( file_exists( $dependancy ))
+        {
+          $manifest[ $dependancy ] = filemtime( $dependancy );
+          $subContent = $this->compile( $dependancy, null, null, $manifest, $level );
+        }
         $content = $this->replaceContent( $match, $subContent, $content );
       }
     }
@@ -103,7 +111,7 @@ class View {
   {
     $compile = false;
     $this->variant = $variant;
-    $this->fileBasename .= $variant;
+    $this->viewFileBase .= $variant;
     $manifestFile = $this->getManifestFile();
     $compiledFile = $this->getCompiledFile();
     if ( file_exists( $compiledFile ) )
@@ -141,31 +149,31 @@ class View {
 
   public function getManifestFile()
   {
-    return $this->fileBasename . '_manifest.php';
+    return $this->viewFileBase . '_manifest.php';
   }
 
 
   public function getCompiledFile()
   {
-    return $this->fileBasename . '_compiled.php';
+    return $this->viewFileBase . '_compiled.php';
   }
   
 
   public function getUncompiledFile()
   {
-    return $this->fileBasename;
+    return $this->viewFileBase;
   }
 
 
   public function getStylesFile()
   {
-    return $this->fileBasename . '.css';
+    return $this->viewFileBase . '.css';
   }
 
 
   public function getScriptFile()
   {
-    return $this->fileBasename . '.js';
+    return $this->viewFileBase . '.js';
   }
 
 

@@ -25,4 +25,12 @@
         in place of `<?php include getThemeFile( 'theme/file/path' ); ?>` !!!
     * Compile now removes white-space infront of single line `<?php` statements  
       with nothing else on the same line to allow indented `<?php` tags in  
-      templates without breaking the final HTML output's formatting.  
+      templates without breaking the final HTML output's formatting.
+
+## 09 July 2022 - Ver 1.4.1
+  - Ensure required files exist before including them.
+    * If not, only insert a text comment.
+  - Change header comments format slightly.
+  - Change $fileDir to $viewDir
+  - Change $fileBasename to $viewFileBase
+  - Add README content.
