@@ -11,3 +11,8 @@
 ## 08 Jul 2022 - Ver 1.2.0
   - Added $baseDir property
   - Set $baseDir via $config[ 'controllersBaseDir' ]
+
+## 09 Jul 2022 - Ver 1.3.0
+  - Add support for 404 Error page.
+  - Added $notFound property. Set `notFound` to the filename of
+    your 404 error view. e.g. [path-to-404-file]/404.html 
