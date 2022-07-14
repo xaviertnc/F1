@@ -2,11 +2,11 @@
 
 /**
  * 
- * F1 - HTTP Class
+ * F1 - HTTP Class - 24 June 2022
  * 
  * @author  C. Moller <xavier.tnc@gmail.com>
  * 
- * @version 1.1.0 - 08 Jul 2022
+ * @version 1.2.0 - 14 July 2022
  *
  */
 
@@ -21,6 +21,8 @@ class HTTP {
     $this->baseUri = trim( $baseUri, '/' );
     $req = new \stdClass();
     $req->uri = $_SERVER[ 'REQUEST_URI' ];
+    $parts = explode( '?', $req->uri, 2 );
+    if ( count( $parts ) === 2 ) $req->uri = $parts[0];
     $req->path = $this->getRequestPath( $req->uri );
     $req->segments = $req->path ? explode( '/', $req->path ) : [];
     $req->method = $_SERVER[ 'REQUEST_METHOD' ];
